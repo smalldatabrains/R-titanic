@@ -1,0 +1,146 @@
+---
+title: "Case study #2 Kaggle's Titanic"
+author: Nicolas
+date: December 23, 2016
+output: html_document
+---
+
+![](boat.png)
+
+##Introduction
+
+The Titanic dataset form Kaggle is famous to start with machine learning. Given a list of people who either survived or died during the Titanic sinking, we are asked to build a predictive model to determinate if regarding some features some other passengers have survived or not. Here is my solution to solve this topic.
+
+Let's load up some data in R, clean it, build some new features, pick the right algorithm and make our prediction. For this study, the databases are provided. We do not have to gather and merge data from different sources. We can directly begin the analysis with R. I begin by loading some basics libraries in R (routine)
+
+```{r message=FALSE}
+library(dplyr) #sorting, merging, filtering, grouping data library
+library(ggplot2) #visualization library
+library(mice)
+```
+
+And set the working directory
+
+
+```{r include=FALSE}
+setwd("C:\\Users\\Nicolas\\Google Drive\\website\\R-titanic")
+```
+
+
+##Datasets
+
+The training dataset provided contains 891 peoples (examples) with their characteristics (features) and the output value (Y) depending on weither their survived (Y=1) or not (Y=0). Let's have a look to the different features :
+
+PassengerId : just a number which refers to the passenger
+Survided : the output we would like to predict.
+Pclass : passenger class. 1st being the upper class, 3rd the lower
+Name : name of the passenger. can be xx.5 years (estimated ages)
+Sex : Sex of the passenger
+Age : age of the passenger
+SibSp : number of Siblings/Spouses aboard
+Parch : number of Parents/Children aboard
+Ticket : Ticket Numer
+Fare : price of the ticket
+Cabin : cabin
+Embarked : Port of embarkation (C = Cherbourg ; Q = Queenstown ; S = Southampton)
+    
+```{r}
+train<-read.csv("train.csv",stringsAsFactors = FALSE,header=TRUE)
+train<-tbl_df(train)
+head(train) #have a look to the training set
+
+str(train)
+```
+
+We can easily check missing values. It may be a little bit trickier for the features with a lot of unique values. Here is a tip to check quantities of na values.
+
+Age, Cabin and Embarked values are missing. We will  have to manage this missing values in a better way (Estimated age? mean age?) in order to feat our predictive model correctly. We could notice that 2 peoples do not have information about their embarkation location.
+
+Some features needs to be studied more deeply. Here are few reasons to try to get deeper into the data :
+
+Name : contains a lot of information depending on the title and the origin of the name. Could give information such as relationship, ethnics, age, native language.
+Sibsp, Parch : both information combined with Name should allow us to reconstruct families inside the boat. It may help us to fill NA values or to create new features to feed our prediction.
+Ticket : some tickets id includes letters at the beginning. We should dig to find out what it means.
+Cabin : Each values begins with a letter which we could assume to be the letter representing a deck on the boat. Looking at Wikipedia, we could see that A,B are the highest decks while F,G are the deepest in the boat. D Deck was the saloon Deck with large public rooms.
+Embarked : Port of embarkation. Southamphton and Queenstown passengers are more likely to be native english speakers whereas Cherbourg (France) aren't?
+
+Few words about the test dataset. We are asked to predict survival for 418 new passengers. Here is the table for missing values :
+
+```{r}
+test<-read.csv("test.csv",stringsAsFactors=FALSE,header=TRUE)
+sapply(test, function(x) sum(is.na(x)))
+```
+
+86 Age values and 1 Fare values are missing for the testing set. We will have to fill missing values to process the data through our model.
+
+![](trip.png)
+
+##Passenger title
+
+Title : let's try to extract the title from the Name feature. We will have to use regular expressions for that one.
+
+gsub(regular expression,replacement,string, perl=TRUE) we replace the character matching with regular expression by ' ' (NULL character) in string.
+
+
+Passenger title
+
+
+```{r}
+table(train$title)
+```
+
+We have 17 categories for title. Some categories have the same meaning so we need to merge them :
+
+Miss / Mlle = Miss (Mlle French for Miss)
+Mr / Mrs / Ms = Mr. I also want to merge Sir in this category.
+
+ 
+
+Family size :
+
+ 
+
+Native language :
+
+ 
+
+Passenger deck :
+
+Do we have enough data to determinate the deck of each passenger, depending on the fare of their ticket. It was late at night (11:40 pm) when the boat encountered the iceberg. I assume that most of passenger were in their respective cabins. Lower decks may be more difficult to escape as they are far from exit on the top of the boat. Room number (the numerals after the letter) are more difficult to exploit and we will drop this part for the study.
+
+Here is a short description of each deck and a link with a "blue print" of the different decks (from upper to lower deck)
+
+Deck A : promenade deck
+Deck B : bridge deck
+Deck C : shelter deck
+Deck D : saloon deck
+Deck E : upper deck
+Deck F : middle deck
+Deck G : lower deck
+Orlop deck :
+
+Some passenger have several cabins on their tickets.
+
+##Merging of data
+
+##Results
+
+
+
+##Titanic the movie
+
+Does our model fit to the 1997 movie from James Cameron? Is Jack likely to die and Kate likely to survive. I am assuming that these two characters have the following features :
+
+![](kateleo.jpg.jpg)
+
+Jack : Pclass(3), Name(Jack),Sex(Male),Age(??),SibSp(0),Parch(0),Ticket(??), Fare(??), Cabin(In a car actually), Embarked(Southampton), title(Mr)
+
+Kate : Pclass(3), Name (Kate), Sex(Male), Age(??), SibSp(0), Parch(0),Ticket(??), Fare(??), Cabin(same a as Jack), Embarked(Southampton),title(Miss)
+
+Processing this data to our model matches with the movie's scenario XD.
+Bonus
+
+Here the link to a small shiny App which allow to visualize some results from the previous study.
+
+
+
