@@ -1,0 +1,3 @@
+Pclass;Age;SibSp;Parch;Fare
+3;20;0;0;1
+1;20;1;1;80
