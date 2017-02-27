@@ -17,6 +17,8 @@ Let's load up some data in R, clean it, build some new features, pick the right 
 library(dplyr) #sorting, merging, filtering, grouping data library
 library(ggplot2) #visualization library
 library(mice)
+library(neuralnet)#deep neural network prediction model
+library(randomForest)
 ```
 
 And set the working directory
@@ -45,16 +47,17 @@ Cabin : cabin
 Embarked : Port of embarkation (C = Cherbourg ; Q = Queenstown ; S = Southampton)
     
 ```{r}
-train<-read.csv("train.csv",stringsAsFactors = FALSE,header=TRUE)
+train<-read.csv("train.csv",stringsAsFactors = FALSE,header=TRUE,na.strings=c("NA", ""))
 train<-tbl_df(train)
 head(train) #have a look to the training set
 
 str(train)
+sapply(train, function(x) sum(is.na(x)))
 ```
 
 We can easily check missing values. It may be a little bit trickier for the features with a lot of unique values. Here is a tip to check quantities of na values.
 
-Age, Cabin and Embarked values are missing. We will  have to manage this missing values in a better way (Estimated age? mean age?) in order to feat our predictive model correctly. We could notice that 2 peoples do not have information about their embarkation location.
+Age, Cabin and Embarked values are missing. We will  have to manage this missing values in a better way (Estimated age? mean age?) in order to feat our predictive model correctly. We could notice that only 2 peoples do not have information about their embarkation location.
 
 Some features needs to be studied more deeply. Here are few reasons to try to get deeper into the data :
 
@@ -75,6 +78,27 @@ sapply(test, function(x) sum(is.na(x)))
 
 ![](trip.png)
 
+##Training a reduced version of the deep neural network
+
+```{r}
+train_reduce<-select(train,Survived,Pclass,Age,SibSp,Parch,Fare)
+```
+
+```{r}
+formula="Survived~Pclass+Age+SibSp+Parch+Fare"
+```
+
+```{r}
+train_reduce_na=na.omit(train_reduce)
+train_reduce_na[,2:6]<-scale(train_reduce_na[,2:6]) #scaling each feature with mean to 0
+```
+
+```{r}
+nn<-neuralnet(formula,train_reduce_na,hidden=c(3))
+plot(nn)
+
+```
+
 ##Passenger title
 
 Title : let's try to extract the title from the Name feature. We will have to use regular expressions for that one.
@@ -84,31 +108,30 @@ gsub(regular expression,replacement,string, perl=TRUE) we replace the character 
 
 Passenger title
 
+##Completing Age data
+If age is missing we are going to set the Age to the average age value.
 
 ```{r}
-table(train$title)
+mean_age<-median(na.omit(train$Age))
+mean_age
 ```
 
-We have 17 categories for title. Some categories have the same meaning so we need to merge them :
 
-Miss / Mlle = Miss (Mlle French for Miss)
-Mr / Mrs / Ms = Mr. I also want to merge Sir in this category.
+The median age is 28. 
 
- 
+```{r}
+train$Age[is.na(train$Age)]<-mean_age
+```
 
-Family size :
 
- 
-
-Native language :
-
- 
-
+##Passenger deck
 Passenger deck :
 
 Do we have enough data to determinate the deck of each passenger, depending on the fare of their ticket. It was late at night (11:40 pm) when the boat encountered the iceberg. I assume that most of passenger were in their respective cabins. Lower decks may be more difficult to escape as they are far from exit on the top of the boat. Room number (the numerals after the letter) are more difficult to exploit and we will drop this part for the study.
 
 Here is a short description of each deck and a link with a "blue print" of the different decks (from upper to lower deck)
+
+![](blueprint.jpg)
 
 Deck A : promenade deck
 Deck B : bridge deck
@@ -121,9 +144,53 @@ Orlop deck :
 
 Some passenger have several cabins on their tickets.
 
-##Merging of data
 
-##Results
+```{r}
+cabin<-select(train,Fare,Cabin)
+#remove empty rows
+cabin_na<-filter(cabin,Cabin!='')
+#let's have a look to the histogram of prices
+hist(cabin_na$Fare,breaks=20)
+```
+We need now to check what's the price range for the different decks. Also we have to take into account that some people have several room for their price (so we will have to divide the price per the number of room to be able to compare everything properly).
+
+```{r}
+#add the feature "nb" which count the number of room per people
+cabin_na=mutate(cabin_na,nb=length(strsplit(cabin_na$Cabin,' ')[[1]]))
+
+#calculate the unit price of the room
+cabin_na=mutate(cabin_na,unitprice=Fare/nb)
+
+#filter the deck name out of the ticket name (keep only the letter)
+cabin_na=mutate(cabin_na,deck=substring(Cabin,0,1))
+
+chart<-ggplot(cabin_na) + geom_boxplot(aes(deck,unitprice))
+chart
+```
+As expected, the lower decks are the cheapest one.n Decks B&C seems to be the most expensive decks. We can notice strong overlaps of the categories. I hope that any error between close decks will not have a big influence on the final prediction model.
+
+Deck A could be a problem, as it has fairly low price and is far from D and E decks. On the blue print it seems that there are only few rooms on that deck, I decided to remove it from our deck prediction model (room around that price will rather be deck from D and E decks).
+
+```{r}
+rf<-randomForest(as.factor(cabin_na$deck)~as.numeric(cabin_na$unitprice),ntree=200)
+plot(rf)
+```
+Now that we have a a model, we can try to predict the cabin's deck for each passenger having a look to the fare price.
+
+```{r}
+cabin_na_vec=model.matrix(~unitprice+deck,data=cabin_na)
+model<-neuralnet(deckB+deckC+deckD+deckE+deckF+deckG+deckT~unitprice,data=cabin_na_vec,hidden=c(3))
+plot(model)
+compute(model,cabin_to_predict)
+```
+
+
+
+##Merging of data and final dataframe creation
+
+
+
+##Prediction with neuralnet library
 
 
 
