@@ -16,7 +16,7 @@ Let's load up some data in R, clean it, build some new features, pick the right 
 ```{r message=FALSE}
 library(dplyr) #sorting, merging, filtering, grouping data library
 library(ggplot2) #visualization library
-library(mice)
+library(polycor)
 library(neuralnet)#deep neural network prediction model
 library(randomForest)
 ```
@@ -91,13 +91,43 @@ formula="Survived~Pclass+Age+SibSp+Parch+Fare"
 ```{r}
 train_reduce_na=na.omit(train_reduce)
 train_reduce_na[,2:6]<-scale(train_reduce_na[,2:6]) #scaling each feature with mean to 0
+test_reduce_na=train_reduce_na[601:714,]
+train_reduce_na=train_reduce_na[1:600,]
+
 ```
 
 ```{r}
-nn<-neuralnet(formula,train_reduce_na,hidden=c(3))
-plot(nn)
+nn1<-neuralnet(formula,train_reduce_na,hidden=c(3))
+plot(nn1)
 
 ```
+
+We can try to evaluate the accuracy of this first naive model. Let's make prediction on the testing set and compare with real values.
+
+```{r}
+test_prediction<-compute(nn1,test_reduce_na[,2:6])$net.result
+test_prediction<-round(test_prediction)
+test_prediction<-cbind(test_prediction,test_reduce_na$Survived)
+colnames(test_prediction)<-c("Predicted","Real")
+```
+
+
+We can count the quantity of rows which have matching data using a for loop and a nested if testing.
+
+```{r}
+total_ok=0
+for (row in (1:dim(test_prediction)[1])){
+  if (test_prediction[row,1]==test_prediction[row,2]){
+    total_ok=total_ok+1
+  }
+  
+  
+}
+accuracy=total_ok/dim(test_prediction)[1]
+print(accuracy)
+```
+
+Accuracy with this simple model is around 68.4%. In order to improve the model, we need to implement a better use of the other parameters. Especially, we removed the gender information from our model, and it seems that clearly have an impact on weither or not the individual survived or not.
 
 ##Passenger title
 
@@ -178,10 +208,33 @@ plot(rf)
 Now that we have a a model, we can try to predict the cabin's deck for each passenger having a look to the fare price.
 
 ```{r}
-cabin_na_vec=model.matrix(~unitprice+deck,data=cabin_na)
-model<-neuralnet(deckB+deckC+deckD+deckE+deckF+deckG+deckT~unitprice,data=cabin_na_vec,hidden=c(3))
+cabin_na_vec=model.matrix(~unitprice+deck-1,data=cabin_na)
+model<-neuralnet(deckA+deckB+deckC+deckD+deckE+deckF+deckG+deckT~unitprice,data=cabin_na_vec,hidden=c(3))
 plot(model)
-compute(model,cabin_to_predict)
+
+```
+
+```{r}
+prediction<-compute(model,cabin_to_predict)$net.result
+```
+
+
+Now we can transform the prediction vector to a deck value
+
+```{r}
+prediction<-apply(prediction,1,function(x) which.max(x))
+as.numeric(prediction)
+```
+```{r}
+for (pred in prediction){
+  if (pred==1) {pred=="A"}
+  else if(pred==2) {prediction=="B"}
+  else if(pred==3) {prediction=="C"}
+  else if(pred==4) {prediction=="D"}
+  else if(pred==5) {prediction=="E"}
+  else if(pred==6) {prediction=="F"}
+}
+prediction
 ```
 
 
